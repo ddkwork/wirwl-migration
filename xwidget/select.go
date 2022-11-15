@@ -1,0 +1,113 @@
+package xwidget
+
+import (
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/theme"
+	fyneWidget "fyne.io/fyne/v2/widget"
+	"image/color"
+	input2 "wirwl/input"
+)
+
+type Select struct {
+	fyneWidget.Select
+	backgroundRenderer *selectBackgroundRenderer
+	canvas             fyne.Canvas
+	inputHandler       input2.Handler
+	menu               *PopUpMenu
+	focused            bool
+	onExitInputMode    func()
+}
+
+type selectBackgroundRenderer struct {
+	fyne.WidgetRenderer
+	color color.Color
+}
+
+func (renderer *selectBackgroundRenderer) BackgroundColor() color.Color {
+	return renderer.color
+}
+
+func (renderer *selectBackgroundRenderer) SetColor(color color.Color) {
+	renderer.color = color
+}
+
+func (selectWidget *Select) CreateRenderer() fyne.WidgetRenderer {
+	renderer := selectWidget.Select.CreateRenderer()
+	bgRenderer := &selectBackgroundRenderer{renderer, theme.BackgroundColor()}
+	selectWidget.backgroundRenderer = bgRenderer
+	return bgRenderer
+}
+
+func NewSelect(canvas fyne.Canvas, handler input2.Handler, choices ...string) *Select {
+	menu := NewPopUpMenu(canvas, handler, choices...)
+	selectWidget := &Select{
+		backgroundRenderer: &selectBackgroundRenderer{},
+		canvas:             canvas,
+		inputHandler:       handler,
+		menu:               menu,
+		focused:            false,
+		onExitInputMode:    func() {},
+	}
+	selectWidget.Options = choices
+	menu.OnChoiceSelectedCallback = func(s string) {
+		selectWidget.SetSelected(s)
+		selectWidget.onExitInputMode()
+	}
+	selectWidget.ExtendBaseWidget(selectWidget)
+	selectWidget.inputHandler.BindFunctionToAction(selectWidget, input2.ExitInputModeAction, func() {
+		selectWidget.canvas.Unfocus()
+		selectWidget.onExitInputMode()
+	})
+	return selectWidget
+}
+
+func (selectWidget *Select) EnterInputMode() {
+	selectWidget.menu.ShowAtPosition(fyne.CurrentApp().Driver().AbsolutePositionForObject(selectWidget))
+	selectWidget.menu.Resize(fyne.NewSize(selectWidget.Size().Width, selectWidget.menu.MinSize().Height))
+}
+
+func (selectWidget *Select) FocusGained() {
+	selectWidget.focused = true
+}
+
+func (selectWidget *Select) FocusLost() {
+	selectWidget.focused = false
+}
+
+func (selectWidget *Select) Focused() bool {
+	return selectWidget.focused
+}
+
+func (selectWidget *Select) TypedRune(r rune) {
+	//Not handled as select doesn't do anything with typed in text
+}
+
+func (selectWidget *Select) TypedKey(event *fyne.KeyEvent) {
+	selectWidget.inputHandler.HandleInNormalMode(selectWidget, event.Name)
+}
+
+func (selectWidget *Select) SetOnConfirm(f func()) {
+	//Not handled as OnConfirm callbacks will be removed from forms elements in the future
+}
+
+func (selectWidget *Select) SetOnExitInputModeFunction(function func()) {
+	selectWidget.onExitInputMode = function
+}
+
+func (selectWidget *Select) Highlight() {
+	selectWidget.backgroundRenderer.SetColor(theme.FocusColor())
+	selectWidget.Refresh()
+}
+
+func (selectWidget *Select) Unhighlight() {
+	selectWidget.backgroundRenderer.SetColor(theme.BackgroundColor())
+	selectWidget.Refresh()
+}
+
+func (selectWidget *Select) SetText(value string) {
+	selectWidget.Selected = value
+}
+
+func (selectWidget *Select) GetText() string {
+	return selectWidget.Selected
+}
